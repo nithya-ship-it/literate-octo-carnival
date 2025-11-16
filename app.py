@@ -1,135 +1,3 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os
-import logging
-import requests
-from datetime import datetime, timedelta
-
-app = Flask(__name__)
-CORS(app)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-PRODUCTS = [
-    {
-        "id": "prod_001",
-        "name": "AirPods Pro",
-        "brand": "Apple",
-        "price": 249.99,
-        "description": "wireless earbuds with active noise cancellation, wireless charging case, spatial audio",
-        "category": "earbuds",
-        "image": "🎧"
-    },
-    {
-        "id": "prod_002",
-        "name": "Galaxy Buds Pro",
-        "brand": "Samsung",
-        "price": 199.99,
-        "description": "wireless earbuds with intelligent ANC, 360 audio, IPX7 water resistance",
-        "category": "earbuds",
-        "image": "🎧"
-    },
-    {
-        "id": "prod_003",
-        "name": "MacBook Air M2",
-        "brand": "Apple",
-        "price": 1199.99,
-        "description": "M2 chip, 13.6-inch Liquid Retina display, 8GB RAM, 256GB SSD",
-        "category": "laptops",
-        "image": "💻"
-    },
-    {
-        "id": "prod_004",
-        "name": "Sony WH-1000XM5",
-        "brand": "Sony",
-        "price": 399.99,
-        "description": "industry-leading noise cancellation, 30-hour battery life, premium sound",
-        "category": "headphones",
-        "image": "🎧"
-    },
-    {
-        "id": "prod_005",
-        "name": "Dell XPS 15",
-        "brand": "Dell",
-        "price": 1499.99,
-        "description": "15.6-inch 4K display, Intel i7, 16GB RAM, 512GB SSD",
-        "category": "laptops",
-        "image": "💻"
-    },
-    {
-        "id": "prod_006",
-        "name": "Bose QuietComfort Earbuds II",
-        "brand": "Bose",
-        "price": 299.99,
-        "description": "wireless earbuds with personalized noise cancellation, comfortable fit, excellent audio quality",
-        "category": "earbuds",
-        "image": "🎧"
-    }
-]
-
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "✅ API is running",
-        "message": "GlomoPay Shopping Assistant API",
-        "version": "1.0.0",
-        "endpoints": {
-            "search": "POST /api/products/search",
-            "checkout": "POST /api/checkout/create",
-            "all_products": "GET /api/products"
-        }
-    })
-
-@app.route('/api/products/search', methods=['POST'])
-def search_products():
-    try:
-        data = request.get_json()
-        
-        if not data or 'query' not in data:
-            return jsonify({
-                "error": "Missing 'query' parameter in request body"
-            }), 400
-        
-        query = data['query'].lower().strip()
-        
-        if not query:
-            return jsonify({
-                "error": "Query cannot be empty"
-            }), 400
-        
-        # Split query into words and remove price/filter words
-        stop_words = {'under', 'over', 'below', 'above', 'around', 'the', 'a', 'an'}
-        query_words = [word for word in query.split() if word not in stop_words and not word.startswith('$') and not word.replace('.', '').isdigit()]
-        
-        # If no valid words remain, use original query
-        if not query_words:
-            query_words = [query]
-        
-        matching_products = []
-        for product in PRODUCTS:
-            product_text = f"{product['name']} {product['brand']} {product['category']} {product['description']}".lower()
-            
-            # Match if ANY query word is found in product text
-            if any(word in product_text for word in query_words):
-                matching_products.append(product)
-        
-        return jsonify({
-            "success": True,
-            "query": query,
-            "count": len(matching_products),
-            "products": matching_products
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error in product search: {str(e)}", exc_info=True)
-        return jsonify({
-            "error": "An error occurred while searching for products"
-        }), 500
-
 @app.route('/api/checkout/create', methods=['POST'])
 def create_checkout():
     try:
@@ -160,7 +28,6 @@ def create_checkout():
                 "error": f"Product with id '{product_id}' not found"
             }), 404
 
-        # Get GlomoPay API key from environment variable
         GLOMOPAY_API_KEY = os.environ.get('GLOMOPAY_API_KEY')
         
         if not GLOMOPAY_API_KEY:
@@ -169,12 +36,47 @@ def create_checkout():
                 "error": "Payment system not configured"
             }), 500
 
-        # Calculate expiry date (6 months from now)
+        # STEP 1: Create customer in GlomoPay
+        customer_payload = {
+            "email": customer_email,
+            "name": customer_email.split('@')[0].title()  # Use email prefix as name
+        }
+
+        logger.info(f"Creating GlomoPay customer: {customer_email}")
+
+        customer_response = requests.post(
+            'https://api.glomopay.com/api/v1/customers',
+            headers={
+                'Authorization': f'Bearer {GLOMOPAY_API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json=customer_payload,
+            timeout=15
+        )
+
+        logger.info(f"GlomoPay customer response status: {customer_response.status_code}")
+
+        if customer_response.status_code not in [200, 201]:
+            logger.error(f"Failed to create customer: {customer_response.text}")
+            return jsonify({
+                "error": "Failed to create customer account",
+                "details": customer_response.text
+            }), 500
+
+        customer_data = customer_response.json()
+        customer_id = customer_data.get('id')
+
+        if not customer_id:
+            logger.error(f"No customer ID in response: {customer_data}")
+            return jsonify({
+                "error": "Failed to get customer ID"
+            }), 500
+
+        # STEP 2: Create payment link with real customer_id
         expires_at = (datetime.utcnow() + timedelta(days=180)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-        # Prepare GlomoPay Payment Link request
         glomopay_payload = {
-            "customer_id": f"cust_{hash(customer_email) % 1000000}",
+            "customer_id": customer_id,  # Real customer ID from GlomoPay
             "payment_methods": ["card"],
             "currency": "USD",
             "amount": int(product['price'] * 100),
@@ -205,7 +107,7 @@ def create_checkout():
             timeout=15
         )
 
-        logger.info(f"GlomoPay response status: {response.status_code}")
+        logger.info(f"GlomoPay payment link response status: {response.status_code}")
 
         if response.status_code in [200, 201]:
             glomopay_data = response.json()
@@ -241,7 +143,8 @@ def create_checkout():
             logger.error(f"GlomoPay API error: {response.status_code} - {response.text}")
             return jsonify({
                 "error": "Failed to create payment link",
-                "status_code": response.status_code
+                "status_code": response.status_code,
+                "details": response.text
             }), 500
 
     except requests.RequestException as e:
@@ -254,15 +157,3 @@ def create_checkout():
         return jsonify({
             "error": "An error occurred while creating checkout session"
         }), 500
-
-@app.route('/api/products', methods=['GET'])
-def get_all_products():
-    return jsonify({
-        "success": True,
-        "count": len(PRODUCTS),
-        "products": PRODUCTS
-    }), 200
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
