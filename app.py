@@ -20,7 +20,7 @@ PRODUCTS = [
         "name": "AirPods Pro",
         "brand": "Apple",
         "price": 249.99,
-        "description": "Wireless earbuds with active noise cancellation, wireless charging case, spatial audio",
+        "description": "wireless earbuds with active noise cancellation, wireless charging case, spatial audio",
         "category": "earbuds",
         "image": "🎧"
     },
@@ -29,7 +29,7 @@ PRODUCTS = [
         "name": "Galaxy Buds Pro",
         "brand": "Samsung",
         "price": 199.99,
-        "description": "Wireless earbuds with intelligent ANC, 360 audio, IPX7 water resistance",
+        "description": "wireless earbuds with intelligent ANC, 360 audio, IPX7 water resistance",
         "category": "earbuds",
         "image": "🎧"
     },
