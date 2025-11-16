@@ -15,7 +15,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 PRODUCTS = [
-   PRODUCTS = [
     {
         "id": "prod_001",
         "name": "AirPods Pro",
@@ -71,7 +70,6 @@ PRODUCTS = [
         "image": "🎧"
     }
 ]
-]
 
 @app.route('/')
 def home():
@@ -103,13 +101,21 @@ def search_products():
                 "error": "Query cannot be empty"
             }), 400
         
-        matching_products = [
-            product for product in PRODUCTS
-            if query in product['name'].lower() or
-               query in product['brand'].lower() or
-               query in product['category'].lower() or
-               query in product['description'].lower()
-        ]
+        # Split query into words and remove price/filter words
+        stop_words = {'under', 'over', 'below', 'above', 'around', 'the', 'a', 'an'}
+        query_words = [word for word in query.split() if word not in stop_words and not word.startswith('$') and not word.replace('.', '').isdigit()]
+        
+        # If no valid words remain, use original query
+        if not query_words:
+            query_words = [query]
+        
+        matching_products = []
+        for product in PRODUCTS:
+            product_text = f"{product['name']} {product['brand']} {product['category']} {product['description']}".lower()
+            
+            # Match if ANY query word is found in product text
+            if any(word in product_text for word in query_words):
+                matching_products.append(product)
         
         return jsonify({
             "success": True,
@@ -171,7 +177,7 @@ def create_checkout():
             "customer_id": f"cust_{hash(customer_email) % 1000000}",
             "payment_methods": ["card"],
             "currency": "USD",
-            "amount": int(product['price'] * 100),  # Convert to cents
+            "amount": int(product['price'] * 100),
             "purpose_code": "P1401",
             "invoice_description": f"{product['brand']} {product['name']} - {product['description']}",
             "reference_number": f"REF_{product_id}_{int(datetime.utcnow().timestamp())}",
@@ -189,7 +195,6 @@ def create_checkout():
 
         logger.info(f"Creating GlomoPay Payment Link for product: {product_id}")
 
-        # Call GlomoPay Payment Link API
         response = requests.post(
             'https://api.glomopay.com/api/v1/payin',
             headers={
