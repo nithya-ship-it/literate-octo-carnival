@@ -15,6 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 PRODUCTS = [
+   PRODUCTS = [
     {
         "id": "prod_001",
         "name": "AirPods Pro",
@@ -47,7 +48,7 @@ PRODUCTS = [
         "name": "Sony WH-1000XM5",
         "brand": "Sony",
         "price": 399.99,
-        "description": "Industry-leading noise cancellation, 30-hour battery life, premium sound",
+        "description": "industry-leading noise cancellation, 30-hour battery life, premium sound",
         "category": "headphones",
         "image": "🎧"
     },
@@ -65,10 +66,11 @@ PRODUCTS = [
         "name": "Bose QuietComfort Earbuds II",
         "brand": "Bose",
         "price": 299.99,
-        "description": "Wireless earbuds with personalized noise cancellation, comfortable fit, excellent audio quality",
+        "description": "wireless earbuds with personalized noise cancellation, comfortable fit, excellent audio quality",
         "category": "earbuds",
         "image": "🎧"
     }
+]
 ]
 
 @app.route('/')
