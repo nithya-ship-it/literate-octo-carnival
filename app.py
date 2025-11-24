@@ -76,7 +76,7 @@ def home():
     return jsonify({
         "status": "✅ API is running",
         "message": "GlomoPay Shopping Assistant API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "endpoints": {
             "search": "POST /api/products/search",
             "checkout": "POST /api/checkout/create",
@@ -140,12 +140,23 @@ def create_checkout():
 
         product_id = data.get('product_id')
         customer_email = data.get('customer_email')
+        customer_phone = data.get('customer_phone')
 
         if not product_id:
             return jsonify({"error": "Missing 'product_id' parameter"}), 400
 
         if not customer_email:
             return jsonify({"error": "Missing 'customer_email' parameter"}), 400
+
+        if not customer_phone:
+            return jsonify({"error": "Missing 'customer_phone' parameter"}), 400
+
+        # Format phone number with +91 prefix for India
+        customer_phone_clean = customer_phone.replace('-', '').replace(' ', '').replace('+', '')
+        if not customer_phone_clean.startswith('91'):
+            customer_phone_formatted = f"+91-{customer_phone_clean}"
+        else:
+            customer_phone_formatted = f"+{customer_phone_clean[:2]}-{customer_phone_clean[2:]}"
 
         product = next((p for p in PRODUCTS if p['id'] == product_id), None)
 
@@ -159,12 +170,13 @@ def create_checkout():
             return jsonify({"error": "Payment system not configured"}), 500
 
         try:
-            # STEP 1: Create customer with ALL required fields
+            # STEP 1: Create customer with real phone number
             customer_name = customer_email.split('@')[0].title()
             customer_payload = {
                 "name": customer_name,
                 "customer_type": "individual",
                 "email": customer_email,
+                "phone": customer_phone_formatted,
                 "address": "123 Main Street",
                 "city": "Bangalore",
                 "state": "Karnataka",
@@ -172,10 +184,10 @@ def create_checkout():
                 "pincode": "560001"
             }
 
-            logger.info(f"Creating customer: {customer_email}")
+            logger.info(f"Creating customer: {customer_email} with phone: {customer_phone_formatted}")
 
             customer_response = requests.post(
-                'https://staging-api.glomopay.com/api/v1/customer',  # SINGULAR!
+                'https://staging-api.glomopay.com/api/v1/customer',
                 headers={
                     'Authorization': f'Bearer {GLOMOPAY_API_KEY}',
                     'Content-Type': 'application/json'
@@ -198,7 +210,7 @@ def create_checkout():
             customer_id = customer_data.get('id')
 
             if not customer_id:
-                logger.error(f"No customer ID: {customer_data}")
+                logger.error(f"No customer ID in response: {customer_data}")
                 return jsonify({"error": "Failed to get customer ID"}), 500
 
             logger.info(f"Customer created successfully: {customer_id}")
@@ -226,11 +238,12 @@ def create_checkout():
                 },
                 "notes": {
                     "product_id": product_id,
-                    "customer_email": customer_email
+                    "customer_email": customer_email,
+                    "customer_phone": customer_phone_formatted
                 }
             }
 
-            logger.info(f"Creating payment link for: {product_id}")
+            logger.info(f"Creating payment link for product: {product_id}")
 
             payment_response = requests.post(
                 'https://staging-api.glomopay.com/api/v1/payin',
@@ -242,7 +255,7 @@ def create_checkout():
                 timeout=15
             )
 
-            logger.info(f"Payment link status: {payment_response.status_code}")
+            logger.info(f"Payment link creation status: {payment_response.status_code}")
             logger.info(f"Payment link response: {payment_response.text}")
 
             if payment_response.status_code in [200, 201]:
@@ -252,8 +265,9 @@ def create_checkout():
                 if not payment_link:
                     logger.warning(f"No payment_link in response: {payment_data}")
                     return jsonify({
-                        "error": "Payment link not generated",
-                        "status": payment_data.get('status')
+                        "error": "Payment link not generated yet",
+                        "status": payment_data.get('status'),
+                        "details": "Payment may require manual review"
                     }), 500
 
                 return jsonify({
@@ -266,24 +280,26 @@ def create_checkout():
                     "customer_email": customer_email,
                     "checkout_url": payment_link,
                     "status": payment_data.get('status'),
+                    "expires_at": payment_data.get('expires_at'),
                     "message": f"Ready to purchase {product['brand']} {product['name']} for ${product['price']}"
                 }), 200
             else:
-                logger.error(f"Payment link failed: {payment_response.text}")
+                logger.error(f"Payment link creation failed: {payment_response.text}")
                 return jsonify({
                     "error": "Failed to create payment link",
+                    "status_code": payment_response.status_code,
                     "details": payment_response.text
                 }), 500
 
         except Exception as e:
             logger.error(f"Payment link error: {str(e)}")
-            return jsonify({"error": f"Payment link failed: {str(e)}"}), 500
+            return jsonify({"error": f"Payment link creation failed: {str(e)}"}), 500
 
     except Exception as e:
         logger.error(f"Checkout error: {str(e)}", exc_info=True)
         return jsonify({"error": "Checkout failed"}), 500
 
-@app.route('/api/products', methods=['GET'])
+@app.route('/api/products', methods='/GET'])
 def get_all_products():
     return jsonify({
         "success": True,
