@@ -175,7 +175,7 @@ def create_checkout():
             logger.info(f"Creating customer: {customer_email}")
 
             customer_response = requests.post(
-                'https://api.glomopay.com/api/v1/customer',  # SINGULAR!
+                'https://staging-api.glomopay.com/api/v1/customer',  # SINGULAR!
                 headers={
                     'Authorization': f'Bearer {GLOMOPAY_API_KEY}',
                     'Content-Type': 'application/json'
@@ -233,7 +233,7 @@ def create_checkout():
             logger.info(f"Creating payment link for: {product_id}")
 
             payment_response = requests.post(
-                'https://api.glomopay.com/api/v1/payin',
+                'https://staging-api.glomopay.com/api/v1/payin',
                 headers={
                     'Authorization': f'Bearer {GLOMOPAY_API_KEY}',
                     'Content-Type': 'application/json'
