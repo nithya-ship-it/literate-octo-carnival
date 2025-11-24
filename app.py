@@ -299,7 +299,7 @@ def create_checkout():
         logger.error(f"Checkout error: {str(e)}", exc_info=True)
         return jsonify({"error": "Checkout failed"}), 500
 
-@app.route('/api/products', methods='/GET'])
+@app.route('/api/products', methods=['GET'])
 def get_all_products():
     return jsonify({
         "success": True,
