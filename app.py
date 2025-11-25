@@ -165,7 +165,7 @@ def create_checkout():
                 "name": customer_name,
                 "customer_type": "individual",
                 "email": customer_email,
-                "dob": "01-01-2000",
+                "dob": "2000-01-01",
                 "nationality": "ARE",
                 "address": "123 Main Street",
                 "city": "Dubai",
