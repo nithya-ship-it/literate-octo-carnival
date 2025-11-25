@@ -140,23 +140,12 @@ def create_checkout():
 
         product_id = data.get('product_id')
         customer_email = data.get('customer_email')
-        customer_phone = data.get('customer_phone')
 
         if not product_id:
             return jsonify({"error": "Missing 'product_id' parameter"}), 400
 
         if not customer_email:
             return jsonify({"error": "Missing 'customer_email' parameter"}), 400
-
-        if not customer_phone:
-            return jsonify({"error": "Missing 'customer_phone' parameter"}), 400
-
-        # Format phone number with +91 prefix for India
-        customer_phone_clean = customer_phone.replace('-', '').replace(' ', '').replace('+', '')
-        if not customer_phone_clean.startswith('91'):
-            customer_phone_formatted = f"+91-{customer_phone_clean}"
-        else:
-            customer_phone_formatted = f"+{customer_phone_clean[:2]}-{customer_phone_clean[2:]}"
 
         product = next((p for p in PRODUCTS if p['id'] == product_id), None)
 
@@ -170,21 +159,22 @@ def create_checkout():
             return jsonify({"error": "Payment system not configured"}), 500
 
         try:
-            # STEP 1: Create customer with real phone number
+            # STEP 1: Create customer with KYC fields
             customer_name = customer_email.split('@')[0].title()
             customer_payload = {
                 "name": customer_name,
                 "customer_type": "individual",
                 "email": customer_email,
-                "phone": customer_phone_formatted,
+                "dob": "01-01-2000",
+                "nationality": "ARE",
                 "address": "123 Main Street",
-                "city": "Bangalore",
-                "state": "Karnataka",
-                "country": "IND",
-                "pincode": "560001"
+                "city": "Dubai",
+                "state": "Dubai",
+                "country": "ARE",
+                "pincode": "00000"
             }
 
-            logger.info(f"Creating customer: {customer_email} with phone: {customer_phone_formatted}")
+            logger.info(f"Creating customer: {customer_email}")
 
             customer_response = requests.post(
                 'https://staging-api.glomopay.com/api/v1/customer',
@@ -238,8 +228,7 @@ def create_checkout():
                 },
                 "notes": {
                     "product_id": product_id,
-                    "customer_email": customer_email,
-                    "customer_phone": customer_phone_formatted
+                    "customer_email": customer_email
                 }
             }
 
